@@ -93,7 +93,7 @@ def play_monthly_transactions(data, month, categoryId):
                     if transaction["categoryId"] == categoryId and not "isTombstone" in transaction:
                         balance += transaction["amount"]
                         debug_print("  Found transaction %s (%s)" % (transaction["amount"], balance))
-    except Exception, e:
+    except Exception as e:
         debug_print(e)
         handle_error("Error finding budget balance", "", "icon-no.png", e)
         debug_print("oh no")
@@ -138,21 +138,15 @@ def handle_error(title, subtitle, icon = "icon-no.png", debug = ""):
 
 def find_budget(path):
     """
-    Given a path (to a YNAB budget bundle) load the meta data and try to 
+    Given a path (to a YNAB budget bundle) load the meta data and try to
     find a datafile with full knowledge we can work from.
     """
     # Look in the ymeta file to find our data directory
-    try:
-        fh = open(os.path.join(path, "Budget.ymeta"), "r")
+    with open(os.path.join(path, "Budget.ymeta"), "r") as fh:
         info = json.load(fh)
-        fh.close()
-    except Exception, e:
-        if fp:
-            fp.close()
-        handle_error("Unable to find budget file :(", path, "icon-no.png", e)
 
     folder_name = info["relativeDataFolderName"]
-    
+
     # Now look in the devices folder, and find a folder which has full knowledge
     devices_path = os.path.join(path, folder_name, "devices")
     devices = os.listdir(devices_path)
@@ -276,7 +270,7 @@ if __name__ == "__main__":
 
     # Logging configuration args
     logConfigArgs = dict()
-    # If the log level was specified 
+    # If the log level was specified
     if args.loglevel:
         # Convert it to something usable
         numeric_level = getattr(logging, args.loglevel.upper(), None)
@@ -294,7 +288,7 @@ if __name__ == "__main__":
     if args.logfile or args.loglevel:
         logging.basicConfig(**logConfigArgs)
 
-    path = ''
+    path = 'ynab-sample/Test~E8570C74.ynab4'
 
     # If we have a setting for the location, use that
     if not path == "":
@@ -316,6 +310,8 @@ if __name__ == "__main__":
     # Load data
     debug_print(path)
     data = load_budget(path)
+    from pprint import pprint
+    pprint(data)
     get_currency_symbol(data)
 
     all = all_categories(data)
