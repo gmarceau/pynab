@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import pytest
 from plumbum import local
-from ynabparse import load_budget, json_loads_js_style
+from json_objects import json_loads_js_style, Object_recursive
+from ynabparse import load_budget
 from pprint import pprint
 
 class TestYnabParse:
@@ -18,14 +19,13 @@ class TestYnabParse:
         assert(actual.a[1].b == 2)
 
     def test_has_top_keys(self):
-        expected = {'payees', 'budgetMetaData', 'accounts', 'accountMappings', 'fileMetaData', 'transactions', 'scheduledTransactions', 'masterCategories', 'monthlyBudgets'}
+        expected = {'payees', 'budgetMetaData', 'accounts', 'accountMappings', 'fileMetaData', 'transactions', 'scheduledTransactions', 'masterCategories', 'monthlyBudgets', 'index'}
         assert(set(self.budget.keys()) == expected)
 
     def test_payees(self):
         expected = {'Target', 'Transfer : Off-Budget', 'Transfer : Checking', 'Starting Balance', 'Transfer : Savings'}
         actual = {p.name for p in self.budget.payees}
         assert(actual == expected)
-
 
 
 if __name__ == '__main__':

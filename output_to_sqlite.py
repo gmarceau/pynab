@@ -1,5 +1,6 @@
 import dataset
 from jsobject import Object
+from utils import is_dead
 
 class OutputToSqlite:
     def __init__(self, budget, out_file):
@@ -50,32 +51,37 @@ class OutputToSqlite:
 
                 scheduled_transactions_table.insert(result)
 
-
-
-    def do_transaction(self, item):
+    def do_transaction(self, item, balances):
         result = Object(item.copy())
         result.has_subtransactions = False
         sub_transactions = []
 
+        if is_dead(item):
+            return
+
         if 'subTransactions' in item:
+            sub_transactions = [sub for sub in item.subTransactions if not is_dead(sub)]
             result.has_subtransactions = bool(item.subTransactions)
-            sub_transactions = item.subTransactions
             result.pop('subTransactions')
 
         if 'matchedTransactions' in item:
             result.pop('matchedTransactions')
+
+        balances[item.accountId] = balances.get(item.accountId, 0) + item.amount
+        result['balance'] = balances[item.accountId]
 
         self.transactions_table.insert(result)
         for sub in sub_transactions:
             self.sub_transactions_table.insert(sub)
 
     def do_transactions(self):
+        balances = {}
         with self.db as tx:
             self.transactions_table = self.db['transactions']
             self.sub_transactions_table = self.db['subTransactions']
 
-            for item in self.budget.transactions:
-                self.do_transaction(item)
+            for item in sorted(self.budget.transactions, key=lambda d: "{}-{}".format(d.date, d.entityId)):
+                self.do_transaction(item, balances)
 
     def do_master_category(self, master_category):
         sub_categories = master_category.subCategories

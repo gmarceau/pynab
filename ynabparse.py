@@ -19,96 +19,10 @@ import logging
 from types import SimpleNamespace as Namespace
 from pprint import pprint
 from plumbum import cli, local # type: ignore
+from forbiddenfruit import curse
 
 import output_to_sqlite
 from json_objects import json_load_js_style
-
-def new_walk_budget(data, category: str) -> float:
-    """
-    New algorithm:
-      Walk all available months
-        If an amount is budgeted, add to running total
-        Play all the transactions in that category for that month
-        If at the end the balance is negative:
-          If overspendingHandling is null, reset balance to 0
-          If overspendingHandling is "confined", keep balance
-    """
-    budget = 0.0
-    saved_budget = None
-    now = datetime.date.today()
-
-    logging.debug("-- Starting walk_budget for %s" % category)
-
-    monthly_budgets = sorted(data.monthlyBudgets, key=lambda k: k.month)
-    saved_budget = 0.0
-
-    for month in monthly_budgets:
-        Y = int(month.month[0:4])
-        M = int(month.month[5:7])
-        budget_month = datetime.date(Y, M, 1)
-        if budget_month > now:
-            # Now we've reached the future so time to stop
-            logging.debug("Reached the future")
-            if not saved_budget == None and budget == 0:
-                budget = saved_budget
-            break
-        logging.debug("")
-        logging.debug("Starting %s with budget of %0.2f" % (month.month, budget))
-        budget += get_monthly_budget(month.monthlySubCategoryBudgets, category)
-        logging.debug("Budgeted amount for %s is %0.2f" %(month.month, budget))
-        budget += play_monthly_transactions(data, month.month[0:7], category)
-        logging.debug("Ended month with balance of %0.2f" % budget)
-        if budget < 0:
-            logging.debug("Category is overspent for this month!")
-            osh = get_overspending_handling(month.monthlySubCategoryBudgets, category)
-
-            if not osh == None and (not osh.lower() == "confined"):
-                logging.debug("Resetting balance to 0")
-                saved_budget = budget
-                budget = 0
-
-    logging.debug("Finished walking budget, balance is %0.2f" % budget)
-    return budget
-
-
-def play_monthly_transactions(data, month: str, categoryId: str) -> float:
-    """
-    Play all the transactions in a category for a month, including
-    split transactions. Return the total of those transactions.
-    """
-    balance = 0
-    found_data = False
-    transactions = data.transactions
-    for transaction in transactions:
-        this_month = transaction.date[0:7]
-        if this_month == month:
-            if transaction.categoryId == "Category/__Split__":
-                for sub_transaction in transaction.subTransactions:
-                    if sub_transaction.categoryId == categoryId and not "isTombstone" in sub_transaction:
-                        balance += sub_transaction.amount
-                        logging.debug("  Found split transaction %s (%s)" % (sub_transaction.amount, balance))
-            else:
-                if transaction.categoryId == categoryId and not "isTombstone" in transaction:
-                    balance += transaction.amount
-                    logging.debug("  Found transaction %s (%s)" % (transaction.amount, balance))
-
-    logging.debug("Monthly spend for this category is %0.2f" % balance)
-
-    return balance
-
-
-def get_monthly_budget(data, category):
-    """
-    Find the amount allocated to a category for a month.
-    """
-    return find_category(date, category).budgeted
-
-def get_overspending_handling(data, category_name):
-    """
-    Find the overspendingHandling for a category in a month
-    """
-    c = find_category(date, category)
-    return hasattr(c, "overspendingHandling") and c.overspendingHandling
 
 def find_full_budget(path):
     """
@@ -140,24 +54,33 @@ def get_currency_symbol(data):
     currency_locale = data.budgetMetaData.currencyLocale
     locale.setlocale(locale.LC_ALL, locale.normalize(currency_locale))
 
-def all_categories(data):
-    """
-    Find all the categories in a budget file, return as a dict by name
-    """
-    pprint(data.masterCategories)
-    sub_categories = [sub_c for mc in data.masterCategories
-                      if mc.name != "Hidden Categories"
-                      for sub_c in mc.subCategories or []]
-    return {sub_c.name: sub_c for sub_c in sub_categories
-            if not (hasattr(sub_c, "isTombstone") and sub_c.isTombstone)}
+def create_index(data):
+    result = {}
 
-def find_category(data, category_name: str) -> int:
-    """
-    Locate a particular category
-    """
-    return all_categories(data).get(category_name)
+    def recur(item):
+        if isinstance(item, dict):
+            if 'entityId' in item:
+                result[item.entityId] = item
+            for v in item.values():
+                recur(v)
+        elif isinstance(item, list):
+            for v in item:
+                recur(v)
+
+    recur(data)
+    return result
+
+
+top_budget = None
+def lookup_entity_id(self):
+    return top_budget.index[self]
+curse(str, "lookup", lookup_entity_id)
+
+
 
 def load_budget(path):
+    global top_budget
+
     if path.is_dir():
         path = find_full_budget(path)
 
@@ -165,10 +88,29 @@ def load_budget(path):
         raise(Exception("Unable to guess budget location"))
 
     data =  json_load_js_style(path)
+    data['index'] = create_index(data)
+    top_budget = data
     return(data)
 
 
+def last_month_envelopes(budget):
+    from envelopes import walk_budget
+    from utils import sub_category_is_dead, sub_category_sort_index
+
+    ids = [c.entityId for mc in budget.masterCategories for c in mc.subCategories or []]
+    ids = [i for i in ids if not sub_category_is_dead(i)]
+
+    envelop_results = {cId: walk_budget(budget, cId) for cId in ids}
+
+
+    envelop_results_sorted = sorted([(k, v[-2]) for k, v in envelop_results.items()],
+                                    key=lambda p: sub_category_sort_index(p[0]))
+    with_names = [(k.lookup().name, v) for k, v in envelop_results_sorted]
+    return with_names
+
 class YnabParse(cli.Application):
+
+
 
     @cli.switch('--loglevel', argtype=str, help='set the log level')
     def log_level(self, level):
@@ -180,12 +122,23 @@ class YnabParse(cli.Application):
         logging.basicConfig(level=numeric_level)
 
     output_sqlite = cli.SwitchAttr('--to-sqlite', argtype=local.path, help='Convert budget to sqlite')
+    repl = cli.Flag('--repl')
 
     @cli.positional(local.path)
     def main(self, path):  # pylint: disable=arguments-differ
         budget = load_budget(path)
+
         if self.output_sqlite:
             output_to_sqlite.do(budget, self.output_sqlite)
+        else:
+            from envelopes import walk_budget
+            pprint(last_month_envelopes(budget))
+            # pprint(walk_budget(budget, 'A69'))
+
+        if self.repl:
+            from ptpython.repl import embed
+            embed(globals(), locals())
+
 
 
 if __name__ == '__main__':
