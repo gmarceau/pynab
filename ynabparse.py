@@ -20,6 +20,9 @@ from types import SimpleNamespace as Namespace
 from pprint import pprint
 from plumbum import cli, local # type: ignore
 
+import output_to_sqlite
+from json_objects import json_load_js_style
+
 def new_walk_budget(data, category: str) -> float:
     """
     New algorithm:
@@ -107,15 +110,12 @@ def get_overspending_handling(data, category_name):
     c = find_category(date, category)
     return hasattr(c, "overspendingHandling") and c.overspendingHandling
 
-def json_loads_with_namespace(filename):
-    return json.loads(filename.read(), object_hook=lambda d: Namespace(**d))
-
 def find_full_budget(path):
     """
     Given a path (to a YNAB budget bundle) load the meta data and try to
     find a datafile with full knowledge we can work from.
     """
-    info = json_loads_with_namespace(path / "Budget.ymeta")
+    info = json_load_js_style(path / "Budget.ymeta")
 
     folder_name = info.relativeDataFolderName
 
@@ -144,6 +144,7 @@ def all_categories(data):
     """
     Find all the categories in a budget file, return as a dict by name
     """
+    pprint(data.masterCategories)
     sub_categories = [sub_c for mc in data.masterCategories
                       if mc.name != "Hidden Categories"
                       for sub_c in mc.subCategories or []]
@@ -163,7 +164,8 @@ def load_budget(path):
     if not path or not path.exists():
         raise(Exception("Unable to guess budget location"))
 
-    return json_loads_with_namespace(path)
+    data =  json_load_js_style(path)
+    return(data)
 
 
 class YnabParse(cli.Application):
@@ -177,11 +179,13 @@ class YnabParse(cli.Application):
             raise ValueError('Invalid log level: %s' % level)
         logging.basicConfig(level=numeric_level)
 
+    output_sqlite = cli.SwitchAttr('--to-sqlite', argtype=local.path, help='Convert budget to sqlite')
+
     @cli.positional(local.path)
     def main(self, path):  # pylint: disable=arguments-differ
-        data = load_budget(path)
-        logging.debug(find_category(data, "Clothing"))
-        pprint(sorted(list(all_categories(data).keys())))
+        budget = load_budget(path)
+        if self.output_sqlite:
+            output_to_sqlite.do(budget, self.output_sqlite)
 
 
 if __name__ == '__main__':
