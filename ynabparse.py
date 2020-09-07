@@ -19,10 +19,10 @@ import logging
 from types import SimpleNamespace as Namespace
 from pprint import pprint
 from plumbum import cli, local # type: ignore
-from forbiddenfruit import curse
 
 import output_to_sqlite
 from json_objects import json_load_js_style
+from load_budget import load_budget
 
 def find_full_budget(path):
     """
@@ -54,51 +54,14 @@ def get_currency_symbol(data):
     currency_locale = data.budgetMetaData.currencyLocale
     locale.setlocale(locale.LC_ALL, locale.normalize(currency_locale))
 
-def create_index(data):
-    result = {}
-
-    def recur(item):
-        if isinstance(item, dict):
-            if 'entityId' in item:
-                result[item.entityId] = item
-            for v in item.values():
-                recur(v)
-        elif isinstance(item, list):
-            for v in item:
-                recur(v)
-
-    recur(data)
-    return result
-
-
-top_budget = None
-def lookup_entity_id(self):
-    return top_budget.index[self]
-curse(str, "lookup", lookup_entity_id)
-
-
-
-def load_budget(path):
-    global top_budget
-
-    if path.is_dir():
-        path = find_full_budget(path)
-
-    if not path or not path.exists():
-        raise(Exception("Unable to guess budget location"))
-
-    data =  json_load_js_style(path)
-    data['index'] = create_index(data)
-    top_budget = data
-    return(data)
 
 
 def last_month_envelopes(budget):
     from envelopes import walk_budget
-    from utils import sub_category_is_dead, sub_category_sort_index
+    from utils import sub_category_is_hidden, sub_category_sort_index
 
     ids = [c.entityId for mc in budget.masterCategories for c in mc.subCategories or []]
-    ids = [i for i in ids if not sub_category_is_dead(i)]
+    ids = [i for i in ids if not sub_category_is_hidden(i)]
 
     envelop_results = {cId: walk_budget(budget, cId) for cId in ids}
 
@@ -109,9 +72,6 @@ def last_month_envelopes(budget):
     return with_names
 
 class YnabParse(cli.Application):
-
-
-
     @cli.switch('--loglevel', argtype=str, help='set the log level')
     def log_level(self, level):
         logConfigArgs = dict()
@@ -131,9 +91,15 @@ class YnabParse(cli.Application):
         if self.output_sqlite:
             output_to_sqlite.do(budget, self.output_sqlite)
         else:
-            from envelopes import walk_budget
-            pprint(last_month_envelopes(budget))
-            # pprint(walk_budget(budget, 'A69'))
+            from ad_hoc import liquid_position, non_liquidable_keywords
+
+            print('liquid now')
+            for m, balances in liquid_position(budget).items():
+                print(m, ', ', balances.total)
+
+            print('liquidable')
+            for m, balances in liquid_position(budget, non_liquidable_keywords).items():
+                print(m, ', ', balances.total)
 
         if self.repl:
             from ptpython.repl import embed

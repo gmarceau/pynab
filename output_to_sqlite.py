@@ -1,6 +1,5 @@
 import dataset
 from jsobject import Object
-from utils import is_dead
 
 class OutputToSqlite:
     def __init__(self, budget, out_file):
@@ -56,11 +55,8 @@ class OutputToSqlite:
         result.has_subtransactions = False
         sub_transactions = []
 
-        if is_dead(item):
-            return
-
         if 'subTransactions' in item:
-            sub_transactions = [sub for sub in item.subTransactions if not is_dead(sub)]
+            sub_transactions = item.subTransactions
             result.has_subtransactions = bool(item.subTransactions)
             result.pop('subTransactions')
 

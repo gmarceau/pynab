@@ -14,7 +14,7 @@ class TestEnvelopes:
 
     def test_play_transactions(self):
         actual = play_transactions(self.budget.transactions, 'Category/__ImmediateIncome__')
-        assert(actual == 1500)
+        assert(actual == 3000)
 
     def test_play_monthly_transaction(self):
         actual = play_monthly_transactions(self.budget, '2014-02', 'Category/__ImmediateIncome__')
@@ -110,7 +110,9 @@ class TestEnvelopes:
                  "balance": 446.82,
                  "outflows": -13.18,
                  "budgeted": 460,
-                 "overspendingHandling": "AffectsBuffer"
+                 "overspendingHandling": "AffectsBuffer",
+                 'entityType': 'monthlyEnvelopResult',
+                 'monthlySubCategoryBudgetsId': 'MB/2012-06'
                 }
             ]
             assert(actual == expected)
@@ -121,7 +123,9 @@ class TestEnvelopes:
                  "balance": -40.53,
                  "outflows": -120.53,
                  "budgeted": 80,
-                 "overspendingHandling": "AffectsBuffer"
+                 "overspendingHandling": "AffectsBuffer",
+                 'entityType': 'monthlyEnvelopResult',
+                 'monthlySubCategoryBudgetsId': 'MB/2012-06'
                 }
             ]
             assert(actual == expected)

@@ -1,4 +1,4 @@
-from utils import is_dead, transaction_month, find
+from utils import transaction_month, transactions_by_month, find
 from jsobject import Object
 from pprint import pprint
 
@@ -19,9 +19,7 @@ def walk_budget(budget, categoryId: str):
     transactions = [t for t in budget.transactions
                     if is_transaction_touches_category(t, categoryId)]
 
-    by_month = OrderedDict({k: list(v) for k, v in
-                            groupby(sorted(transactions, key=lambda t: t.date),
-                                    key=transaction_month)})
+    by_month = transactions_by_month(transactions)
 
     balance = 0.0
     overspendingHandling = 'AffectsBuffer'
@@ -63,14 +61,11 @@ def walk_budget(budget, categoryId: str):
 
 
 def is_transaction_touches_category(transaction, categoryId) -> bool:
-    if is_dead(transaction):
-        return False
-
     if transaction.categoryId == categoryId:
         return True
 
     if transaction.categoryId == "Category/__Split__":
-        return any(sub.categoryId == categoryId and not is_dead(sub)
+        return any(sub.categoryId == categoryId
                    for sub in transaction.subTransactions)
 
     return False
@@ -89,7 +84,7 @@ def play_transactions(transactions, categoryId: str) -> float:
             balance += transaction.amount
         else:
             for sub_transaction in transaction.subTransactions:
-                if sub_transaction.categoryId == categoryId and not is_dead(sub_transaction):
+                if sub_transaction.categoryId == categoryId:
                     balance += sub_transaction.amount
 
     return balance

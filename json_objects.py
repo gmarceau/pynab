@@ -15,12 +15,9 @@ def json_load_js_style(filename):
 
 
 def Object_recursive(item):
-    def up(item):
-        if isinstance(item, dict):
-            return Object({k: Object_recursive(v) for k, v in item.items()})
-        elif isinstance(item, list):
-            return [Object_recursive(i) for i in item]
-        else:
-            return item
-
-    return up(item)
+    if isinstance(item, dict):
+        return Object({k: Object_recursive(v) for k, v in item.items()})
+    elif isinstance(item, list):
+        return [Object_recursive(i) for i in item]
+    else:
+        return item
