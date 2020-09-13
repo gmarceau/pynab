@@ -17,6 +17,7 @@ def new_or_cached_shell(v):
     shells[id(v)] = result
     return result
 
+@property
 def jsobject_up(self):
     """Detects all the spells that have methods for this object. Returns a shells that
     proxy to this object, and decorates it with the compatible methods.
@@ -34,18 +35,19 @@ def jsobject_up(self):
 setattr(Object, 'up', jsobject_up)
 curse(list, 'up', jsobject_up)
 
-def find_beam(active_spells, destination_spell):
+def find_beam(v, active_spells, destination_spell_name):
     result = []
+    destination_spell_name += 'Spell'
     for s in active_spells:
         for attribute_name, attr in s.__dict__.items():
             beams_to = getattr(attr, 'beams_to', None)
-            if beams_to == destination_spell:
+            if beams_to and beams_to.__name__.lower() == destination_spell_name.lower():
                 result.append(attr)
 
     if not result:
-        raise Exception('could not find beam to {} for {}'.format(destination_spell, self))
+        raise Exception('could not find beam to {} for {}'.format(destination_spell_name, v))
     if len(result) > 1:
-        raise Exception('found more than one beam to {}: {}'.format(destination_spell, result))
+        raise Exception('found more than one beam to {}: {}'.format(destination_spell_name, result))
     return result[0]
 
 def find_beam_to(active_spells, destination_spell):
@@ -71,6 +73,8 @@ class Shell:
     def _detect(self):
         global spells
         self.__dict__['_active_spells'] = {s for s in spells if s._detect(self._v)}
+        print('--74', spells)
+        print('--75', self.__dict__['_active_spells'])
 
     def __getattr__(self, name):
         print('--34 getattr', name, self.__dict__['_active_spells'])
@@ -94,15 +98,26 @@ class Shell:
     def __str__(self):
         return str(self.__dict__['_v'])
 
-    def to(self, destination_spell):
-        beam = find_beam(self.__dict__['_active_spells'], destination_spell)
-        result = beam(self)
-        print('--109', result, type(result), destination_spell)
+    @property
+    def to(self):
+        print('--99', self.__dict__['_active_spells'])
 
-        assert(destination_spell._detect(result))
-        result = new_or_cached_shell(result)
-        result.__dict__['_active_spells'].add(destination_spell)
-        return result
+        class To:
+            def __getattr__(sub_self, destination_spell_name):
+                beam = find_beam(self, self.__dict__['_active_spells'], destination_spell_name)
+                destination_spell = getattr(beam, 'beams_to')
+                def wrapper(*args, **xargs):
+                    result = beam(self, *args, **xargs)
+                    print('--109', result, type(result), destination_spell)
+                    assert(destination_spell._detect(result))
+                    result = new_or_cached_shell(result)
+                    result.__dict__['_active_spells'].add(destination_spell)
+                    return result
+                return wrapper
+
+        return To()
+
+
 
     def beam_to(self, destination_spell):
         beam = find_beam_to(self.__dict__['_active_spells'], destination_spell)

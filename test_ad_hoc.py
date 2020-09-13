@@ -10,8 +10,7 @@ class TestAdHoc:
     def test_liquid_positions(self):
         input = load_budget(local.path('example-budget.yfull.json'))
         actual = liquid_position(input)
-        actual = [m for m in actual.items() if m[1].total != 0][0:3]
-        pprint(actual)
+        actual = list(actual.items())[0:3]
         expected = [('2014-02',
                      {'Checking': 400, 'Off-Budget': 200, 'Savings': 1000, 'total': 1600}),
                     ('2014-03',
