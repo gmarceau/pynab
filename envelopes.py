@@ -1,6 +1,7 @@
-from utils import transaction_month, transactions_by_month, find
 from jsobject import Object
-from pprint import pprint
+from utils import find
+from transactions import transactions_by_month
+from transactions import play_transactions_category, transaction_touches_category
 
 def walk_budget(budget, categoryId: str):
     """
@@ -13,11 +14,8 @@ def walk_budget(budget, categoryId: str):
 
       Returns the state of the category across all month as an array
     """
-    from collections import OrderedDict
-    from itertools import groupby
-
     transactions = [t for t in budget.transactions
-                    if is_transaction_touches_category(t, categoryId)]
+                    if transaction_touches_category(t, categoryId)]
 
     by_month = transactions_by_month(transactions)
 
@@ -35,7 +33,7 @@ def walk_budget(budget, categoryId: str):
 
         budgeted = category_budget.get('budgeted', 0)
 
-        outflows = play_transactions(by_month.get(year_month, []), categoryId)
+        outflows = play_transactions_category(by_month.get(year_month, []), categoryId)
 
         balance = round(balance + budgeted + outflows, 2)
 
@@ -58,42 +56,3 @@ def walk_budget(budget, categoryId: str):
         result.append(result_this_month)
 
     return result
-
-
-def is_transaction_touches_category(transaction, categoryId) -> bool:
-    if transaction.categoryId == categoryId:
-        return True
-
-    if transaction.categoryId == "Category/__Split__":
-        return any(sub.categoryId == categoryId
-                   for sub in transaction.subTransactions)
-
-    return False
-
-def play_transactions(transactions, categoryId: str) -> float:
-    """
-    Play all the transactions in a categoryId
-    split transactions. Return the total of those transactions.
-    """
-    balance = 0
-    for transaction in transactions:
-        if not is_transaction_touches_category(transaction, categoryId):
-            continue
-
-        if transaction.categoryId == categoryId:
-            balance += transaction.amount
-        else:
-            for sub_transaction in transaction.subTransactions:
-                if sub_transaction.categoryId == categoryId:
-                    balance += sub_transaction.amount
-
-    return balance
-
-def play_monthly_transactions(budget, month, categoryId: str) -> float:
-    """
-    Play all the transactions in a categoryId for a month, including
-    split transactions. Return the total of those transactions.
-    """
-    transactions_for_month = [t for t in budget.transactions
-                              if transaction_month(t) == month]
-    return play_transactions(transactions_for_month, categoryId)

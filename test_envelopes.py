@@ -3,7 +3,7 @@ import pytest
 from pprint import pprint
 from plumbum import local
 from json_objects import Object_recursive
-from envelopes import walk_budget, play_transactions, play_monthly_transactions
+from envelopes import walk_budget
 from ynabparse import load_budget
 
 class TestEnvelopes:
@@ -11,16 +11,6 @@ class TestEnvelopes:
     def load_budget(self):
         self.budget = load_budget(local.path('example-budget.yfull.json'))
         yield
-
-    def test_play_transactions(self):
-        actual = play_transactions(self.budget.transactions, 'Category/__ImmediateIncome__')
-        assert(actual == 3000)
-
-    def test_play_monthly_transaction(self):
-        actual = play_monthly_transactions(self.budget, '2014-02', 'Category/__ImmediateIncome__')
-        assert(actual == 1500)
-        actual = play_monthly_transactions(self.budget, '2014-02', 'A18')
-        assert(actual == -100)
 
     def test_walk_budget_with_one_month(self):
             budget = Object_recursive({

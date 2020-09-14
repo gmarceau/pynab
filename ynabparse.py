@@ -94,12 +94,12 @@ class YnabParse(cli.Application):
             from ad_hoc import liquid_position, non_liquidable_keywords
 
             print('liquid now')
-            for m, balances in liquid_position(budget).items():
+            for m, balances in liquid_position(budget, ["Guillaume's Checking"]).items():
                 print(m, ', ', balances.total)
 
-            print('liquidable')
-            for m, balances in liquid_position(budget, non_liquidable_keywords).items():
-                print(m, ', ', balances.total)
+            # print('liquidable')
+            # for m, balances in liquid_position(budget, non_liquidable_keywords).items():
+            #     print(m, ', ', balances.total)
 
         if self.repl:
             from ptpython.repl import embed

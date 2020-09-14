@@ -51,8 +51,6 @@ class TransactionsSpell(Spell):
     @beam_to(MonthlyTransactionsSpell)
     def beam_to_montly(self):
         return groupby(self, key=transaction_month)
-        assert(MonthlyTransactionsSpell._detect(result))
-        return result
 
 TransactionsSpell.study_globally()
 
@@ -82,7 +80,7 @@ transactions = Object_recursive([{"date": "2014-03-04",
 
 def test_spell_on_transactions_list():
     global shells
-    a = transactions.up()
+    a = transactions.up
     print('--33', dict(shells))
 
     assert(id(transactions) != id(a))
@@ -91,7 +89,7 @@ def test_spell_on_transactions_list():
     pprint(a)
     assert(a.balance() == 100)
     assert(a.balance() == 100)
-    b = transactions.up()
+    b = transactions.up
     assert(id(transactions) != id(a))
     assert(id(b) == id(a))
     assert(len(b) == 2)
@@ -104,7 +102,7 @@ def test_spell_on_transactions_list():
     assert(len(shells) == 0)
 
 def test_spell_weakref():
-    a = transactions.up()
+    a = transactions.up
     assert(len(shells) == 1)
     del a
     assert(len(shells) == 0)
@@ -112,7 +110,7 @@ def test_spell_weakref():
 
 
 def test_beams_to():
-    actual = transactions.up().to(MonthlyTransactionsSpell)
+    actual = transactions.up.to.monthlyTransactions()
     expected = {'2014-03': [{'date': '2014-03-04', 'entityId':
                              'B850E42E-B8B0-AE20-C396-417D83E94D9C', 'entityType': 'transaction',
                              'accepted': True, 'amount': 200, 'entityVersion': 'A-73', 'cleared':

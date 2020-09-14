@@ -1,7 +1,7 @@
 from pprint import pprint
 from json_objects import Object
-
-
+from transactions import play_transactions, transaction_month
+from utils import groupby
 
 non_liquidable_keywords = ['Mortgage', 'LineofCredit', 'CreditCard',
                            'MerchantAccount', 'OtherLiability',
@@ -13,7 +13,7 @@ non_liquid_account_keywords = non_liquidable_keywords + \
 def liquid_position(budget, account_filter_keywords=None):
     import re
     from collections import OrderedDict
-    from utils import transactions_by_month
+    from transactions import transactions_by_month
     from itertools import dropwhile
 
     if not account_filter_keywords:
@@ -27,21 +27,26 @@ def liquid_position(budget, account_filter_keywords=None):
             not re.search(account_filter_re, account.accountType)
 
     relevant_accounts = {acc.entityId for acc in budget.accounts if is_relevant_account(acc)}
-    pprint([acc.lookup().accountName for acc in relevant_accounts])
+
+    by_account = {acc: txs for acc, txs in
+                  groupby(budget.transactions, key=lambda t: t.accountId).items()
+                  if acc in relevant_accounts}
+
+    for acc, txs in by_account.items():
+        by_account[acc] = play_transactions(txs, accountId=acc, decorate=True)
 
     months = sorted([mb.month[0:7] for mb in budget.monthlyBudgets])
-    txs_by_months = transactions_by_month(budget.transactions)
-
     result = OrderedDict({m: Object() for m in months})
 
-    for acc in relevant_accounts:
+    for acc, txs in by_account.items():
+        by_month = groupby(txs, key=transaction_month)
         balance = 0
         for month in months:
-            this_month = [tx for tx in txs_by_months.get(month, [])
-                          if tx.accountId == acc]
+            if by_month.get(month):
+                balance = by_month[month][-1].balance
+            print('--46', month, balance, len(by_month.get(month, [])))
 
-            sum_this_month = sum([tx.amount for tx in this_month])
-            balance = balance + sum_this_month
+            pprint(by_month.get(month, []))
             result[month][acc.lookup().accountName] = balance
 
     for month_result in result.values():
